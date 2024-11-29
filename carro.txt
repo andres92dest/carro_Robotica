@@ -1,0 +1,101 @@
+#include "SR04.h" // Librería del sensor ultrasonido
+#define TRIG_PIN 12 // Pin TRIG del sensor ultrasonido
+#define ECHO_PIN 11 // Pin ECHO del sensor ultrasonido
+
+SR04 sr04 = SR04(ECHO_PIN, TRIG_PIN); // Crear objeto del sensor ultrasonido
+long distanciaUltrasonido; // Variable para almacenar la distancia medida
+int conteoObstaculos = 0; // Contador de obstáculos detectados
+
+int sensorIR1 = A0; // Sensor IR 1
+int sensorIR2 = A1; // Sensor IR 2
+int umbralIR = 200; // Umbral de detección para los sensores IR
+
+// Pines del motor trasero
+int motorPin = 4; // Pin de control del motor
+int direccionPin = 5; // Pin para dirección del motor
+
+void setup() {
+  Serial.begin(9600); // Inicia comunicación serial
+  pinMode(motorPin, OUTPUT); // Configura el pin del motor como salida
+  pinMode(direccionPin, OUTPUT); // Configura el pin de dirección como salida
+  pinMode(sensorIR1, INPUT); // Configura el sensor IR1 como entrada
+  pinMode(sensorIR2, INPUT); // Configura el sensor IR2 como entrada
+}
+
+void loop() {
+  // Leer la distancia con el ultrasonido
+  distanciaUltrasonido = sr04.Distance();
+  
+  // Mostrar la distancia medida en el monitor serial
+  Serial.print("Distancia Ultrasonido: ");
+  Serial.print(distanciaUltrasonido);
+  Serial.println(" cm");
+
+  // Leer los valores de los sensores IR
+  int valorIR1 = analogRead(sensorIR1);
+  int valorIR2 = analogRead(sensorIR2);
+
+  // Imprimir valores de los sensores IR
+  Serial.print("Sensor IR1: ");
+  Serial.print(valorIR1);
+  Serial.print(" Sensor IR2: ");
+  Serial.println(valorIR2);
+
+  // Tomar decisiones con los sensores IR para seguir el camino
+  if (valorIR1 < umbralIR && valorIR2 < umbralIR) {
+    Serial.println("Ambos sensores detectan línea. Avanzando.");
+    moverMotor(HIGH);
+  } else if (valorIR1 < umbralIR) {
+    Serial.println("Sensor IR1 detecta línea. Girando a la derecha.");
+    girarMotor(HIGH);
+  } else if (valorIR2 < umbralIR) {
+    Serial.println("Sensor IR2 detecta línea. Girando a la izquierda.");
+    girarMotor(LOW);
+  } else {
+    Serial.println("Ningún sensor detecta línea. Deteniendo.");
+    moverMotor(LOW);
+  }
+
+  // Contar obstáculos si están en el rango de 16 cm a 20 cm
+  if (distanciaUltrasonido >= 16 && distanciaUltrasonido <= 20) {
+    conteoObstaculos++;
+    Serial.print("Obstáculo detectado: ");
+    Serial.println(conteoObstaculos);
+    delay(1000); // Retraso para evitar conteos repetidos
+  }
+
+  // Si se detectan dos obstáculos, detener todo
+  if (conteoObstaculos >= 2) {
+    detenerMotores();
+    Serial.println("Segundo obstáculo detectado. Motores detenidos.");
+    while (true); // Detiene el programa
+  }
+
+  delay(200); // Pequeño retraso para estabilizar las lecturas
+}
+
+// Función para mover el motor trasero
+void moverMotor(int estado) {
+  digitalWrite(direccionPin, HIGH); // Configura la dirección del motor
+  digitalWrite(motorPin, estado);  // Enciende o apaga el motor
+}
+
+// Función para girar el motor delantero
+void girarMotor(int direccion) {
+  if (direccion == HIGH) {
+    Serial.println("Girando a la derecha.");
+    digitalWrite(direccionPin, HIGH);
+  } else {
+    Serial.println("Girando a la izquierda.");
+    digitalWrite(direccionPin, LOW);
+  }
+  digitalWrite(motorPin, HIGH);
+  delay(500); // Tiempo para completar el giro
+  moverMotor(LOW); // Detener después de girar
+}
+
+// Función para detener todos los motores
+void detenerMotores() {
+  digitalWrite(motorPin, LOW); // Apaga el motor trasero
+  Serial.println("Motores detenidos.");
+}
